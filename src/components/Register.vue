@@ -9,7 +9,7 @@
       <form @submit.prevent="handleConnect">
         <div class="form-group server-input-container">
           <div class="protocol-select">
-            <select v-model="form.protocol" :disabled="isConnected" class="protocol-dropdown">
+            <select v-model="form.protocol" :disabled="isConnected || userIntentConnecting" class="protocol-dropdown">
               <option value="https">wss://</option>
               <option value="http" :disabled="isHttpsEnv" :title="isHttpsEnv ? '在HTTPS环境下必须使用WSS协议' : ''">ws://</option>
             </select>
@@ -17,7 +17,7 @@
           <div class="server-input">
             <input 
               v-model="form.serverAddress" 
-              :disabled="isConnected"
+              :disabled="isConnected || userIntentConnecting"
               placeholder="Server Address (e.g., example.com)" 
               required
               @keyup.enter="handleConnect"
@@ -28,7 +28,7 @@
         <div class="form-group">
           <input 
             v-model="form.room" 
-            :disabled="isConnected"
+            :disabled="isConnected || userIntentConnecting"
             placeholder="Room ID (Only include characters)" 
             required
             pattern="[A-Za-z0-9\-]+"
@@ -38,7 +38,7 @@
         <div class="form-group">
           <input 
             v-model="form.userId" 
-            :disabled="isConnected"
+            :disabled="isConnected || userIntentConnecting"
             placeholder="User ID (Only include characters)" 
             required
             pattern="[A-Za-z0-9\-]+"
@@ -57,7 +57,7 @@
           <div class="form-group">
             <input 
               v-model="form.customPort" 
-              :disabled="isConnected"
+              :disabled="isConnected || userIntentConnecting"
               placeholder="Custom Port (Leave blank for default)" 
               @keyup.enter="handleConnect"
               type="string"
@@ -70,22 +70,43 @@
         <div class="buttons">
           <button
             type="submit"
-            :disabled="isConnected"
-            :class="['connect-button', { disabled: isConnected }]"
+            :disabled="isConnected || userIntentConnecting"  
+            :class="['connect-button', { disabled: isConnected || userIntentConnecting }]"
           >
             Connect
           </button>
           <button
             type="button"
             @click="handleDisconnect"
-            :disabled="!isConnected"
-            :class="['disconnect-button', { disabled: !isConnected, active: isConnected }]"
+            :disabled="!isConnected || userIntentConnecting"
+            :class="['disconnect-button', { disabled: !isConnected || userIntentConnecting, active: isConnected }]"
           >
             Disconnect
           </button>
         </div>
       </form>
     </div>
+
+    <van-popup
+      v-model:show="userIntentConnecting"
+      :close-on-click-overlay="false"
+      round
+      position="center"
+      style="padding: 2rem; width: 250px; text-align: center;"
+    >
+      <van-loading type="spinner" vertical color="#1989fa" text-size="14px">
+        正在连接服务器...
+      </van-loading>
+      <van-button
+        type="default"
+        size="small"
+        @click="handleCancelConnect"
+        style="margin-top: 1.5rem; width: 100px;"
+      >
+        取消
+      </van-button>
+    </van-popup>
+
   </div>
 </template>
 
@@ -109,9 +130,16 @@ const emit = defineEmits<{
 
 const connectionStore = useConnectionStore();
 const advancedOpen = ref(false);
+const userIntentConnecting = ref(false);
 
 const isHttpsEnv = computed(() => typeof window !== 'undefined' && window.location.protocol === 'https:');
 const isConnected = computed(() => connectionStore.isConnected);
+
+watch(() => connectionStore.isConnected, (connected) => {
+  if (connected) {
+    userIntentConnecting.value = false;
+  }
+});
 
 const form = reactive<FormState>({
   serverAddress: connectionStore.serverAddress || '',
@@ -167,38 +195,32 @@ const updateConnectionStore = () => {
 
 const handleConnect = async () => {
   if (!validateForm()) return;
-  
+
   updateConnectionStore();
-  
-  Toast.loading({
-    message: '正在连接服务器...',
-    forbidClick: true,
-    duration: 0
-  });
+  userIntentConnecting.value = true;
 
   try {
-    await SocketService.connect(getServerUrl());
-    await SocketService.register(form.room.trim(), form.userId.trim());
+    SocketService.joinRoom(form.room.trim(), form.userId.trim(), getServerUrl());
   } catch (error) {
-    Toast.clear();
-    Toast.fail('连接失败，请重试');
-    console.error('连接失败:', error);
+    console.error('发起连接调用时出错 (意外情况):', error);
+    userIntentConnecting.value = false;
+    connectionStore.setConnectingAttempt(false);
+    Toast.fail('发起连接时出错，请检查设置');
   }
 };
 
+const handleCancelConnect = () => {
+  console.log('用户取消连接');
+  userIntentConnecting.value = false;
+  SocketService.disconnect();
+};
+
 const handleDisconnect = async () => {
-  Toast.loading({
-    message: '正在断开连接...',
-    forbidClick: true,
-    duration: 1000
-  });
-  
+  userIntentConnecting.value = false;
   try {
-    await SocketService.disconnect();
+    SocketService.disconnect();
   } catch (error) {
-    Toast.clear();
-    console.error('断开连接失败:', error);
-    Toast.fail('断开连接失败，请重试');
+    console.error('断开连接时捕获到意外错误:', error);
   }
 };
 
