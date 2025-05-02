@@ -250,8 +250,7 @@ class SocketService {
 
   private async tryAutoCopy(data: Message): Promise<void> {
     try {
-      const isOwnMessage = data.userId === this.connectionStore.userId;
-      const shouldCopyText = data.type === MessageType.TEXT && this.settingsStore.autoCopyText && !isOwnMessage;
+      const shouldCopyText = data.type === MessageType.TEXT && this.settingsStore.autoCopyText;
       const shouldCopyImage = data.type === MessageType.IMAGE && this.settingsStore.autoCopyImage;
       
       if (shouldCopyText || shouldCopyImage) {
