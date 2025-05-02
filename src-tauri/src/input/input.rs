@@ -185,7 +185,6 @@ fn node_to_type_sequence(node: Node) -> String {
     if !node.is_single_line {
         type_seq.push(KEY_RIGHT);
         type_seq.push(KEY_END);
-        type_seq.push('\n');
     }
     
     type_seq

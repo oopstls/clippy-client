@@ -40,27 +40,39 @@ impl Node {
         self.contents.push(NodeContent::Child(Box::new(child)));
     }
 
-    /// 移除最后一个字符串内容的尾部换行符及空格
-    fn trim_last_newline(&mut self) {
-        // 递归处理所有子节点
+    /// 过滤规则
+    fn filters(&mut self) {
+        // 如果没有内容，则不需要过滤
+        if self.contents.is_empty() {
+            return;
+        }
+
+        // 对所有子节点递归应用过滤
         for content in &mut self.contents {
             if let NodeContent::Child(child) = content {
-                child.trim_last_newline();
+                child.filters();
             }
         }
 
-        // 找到最后一个字符串内容
-        if let Some(NodeContent::Text(text)) = self.contents.last_mut() {
-            // 先移除尾部的空格
-            while matches!(text.chars().last(), Some(' ' | '\t')) {
-                text.pop();
+        // 过滤1: 如果第一个子节点是文本节点且以\n开头，则移除该\n
+        if let Some(NodeContent::Text(text)) = self.contents.first_mut() {
+            if text.starts_with('\n') {
+                // 移除第一个字符 \n
+                *text = text[1..].to_string();
+                
+                // 如果移除后字符串为空，则删除这个节点
+                if text.is_empty() {
+                    self.contents.remove(0);
+                }
             }
-            // 再检查并移除换行符
-            if text.ends_with('\n') {
-                text.pop();
-                // 再次移除可能的尾部空格
-                while matches!(text.chars().last(), Some(' ' | '\t')) {
-                    text.pop();
+        }
+
+        // 过滤2: 如果最后一个子节点是文本节点且以\n+空格结尾，则移除这部分
+        if let Some(NodeContent::Text(text)) = self.contents.last_mut() {
+            if let Some(pos) = text.rfind('\n') {
+                let tail = &text[pos+1..];
+                if tail.chars().all(|c| c.is_whitespace()) {
+                    *text = text[..pos].to_string();
                 }
             }
         }
@@ -105,7 +117,7 @@ impl Parser {
         let mut root = Node::new("root", 1);
         let (_, last_line) = self.parse_content(text, &mut root, 1)?;
         root.end_line = last_line;
-        root.trim_last_newline();
+        root.filters();
         Ok(root)
     }
 
