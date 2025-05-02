@@ -1,19 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { platform } from '@tauri-apps/plugin-os';
-import { isTauri } from '@tauri-apps/api/core';
-
-const isMacOS = isTauri() ? platform() === 'macos' : false;
-
-const getModKey = () => isMacOS ? 'Command' : 'Alt';
 
 export const useSettingsStore = defineStore('settings', () => {
   // 自动复制设置
   const autoCopyText = ref(true);
   const autoCopyImage = ref(false);
 
-  const hotkeySendText = ref(`Control+${getModKey()}+J`);
-  const hotkeyScreenshot = ref(`Control+${getModKey()}+K`);
+  const hotkeySendText = ref(`Control+J`);
+  const hotkeyScreenshot = ref(`Control+K`);
+  const hotkeyClipRegModifier = ref(`Control`); // 剪切板寄存器修饰键
 
   // 显示器设置
   const selectedMonitor = ref(0);
@@ -34,6 +29,10 @@ export const useSettingsStore = defineStore('settings', () => {
     hotkeyScreenshot.value = newHotkey;
   };
 
+  const setHotkeyClipRegModifier = (newHotkey: string) => {
+    hotkeyClipRegModifier.value = newHotkey;
+  };
+
   const setSelectedMonitor = (index: number) => {
     selectedMonitor.value = index;
   };
@@ -43,11 +42,13 @@ export const useSettingsStore = defineStore('settings', () => {
     autoCopyImage,
     hotkeySendText,
     hotkeyScreenshot,
+    hotkeyClipRegModifier,
     selectedMonitor,
     setAutoCopyText,
     setAutoCopyImage,
     setReadClipboardTextHotkeySendText,
     setReadClipboardTextHotkeyScreenshot,
+    setHotkeyClipRegModifier,
     setSelectedMonitor,
   };
 }); 

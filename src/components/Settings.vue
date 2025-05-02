@@ -31,7 +31,7 @@
             v-if="tooltipState.clipReg" 
             class="tooltip"
           >
-            5个剪切板寄存器，Ctrl+Alt+1~5取出寄存器并粘贴，Ctrl+Alt+6~0写入寄存器(对应Ctrl+Alt+1~5输入)，Ctrl+Alt+Shift+1~5模拟输入
+            5个剪切板寄存器，使用快捷键操作：修饰键+1~5取出寄存器并粘贴，修饰键+6~0写入寄存器
           </div>
         </div>
         <input 
@@ -65,6 +65,34 @@
           v-model="clipRegSyncEnabled" 
           class="toggle-checkbox"
         />
+      </div>
+      
+      <!-- 剪切板寄存器修饰键设置 - 仅在剪切板寄存器启用时显示 -->
+      <div v-if="isTauriEnv && clipRegEnabled" class="setting-item flex items-center justify-between mb-4 ml-6 relative">
+        <div class="flex items-center space-x-2">
+          <label class="text-md font-medium">寄存器修饰键</label>
+          <font-awesome-icon 
+            :icon="['fas', 'circle-info']" 
+            class="w-4 h-4 text-gray-500 hover:text-gray-700 cursor-pointer"
+            @mouseenter="tooltipState.clipRegModifier = true"
+            @mouseleave="tooltipState.clipRegModifier = false"
+          />
+          <div 
+            v-if="tooltipState.clipRegModifier" 
+            class="tooltip"
+          >
+            设置寄存器操作的修饰键，如Ctrl+1为粘贴1号寄存器内容
+          </div>
+        </div>
+        <button
+          @click="() => startListeningForClipRegModifier()"
+          class="hotkey-button"
+          :disabled="isListening"
+        >
+          <span v-if="!isListening || activeConfigType !== 'clipRegModifier'">{{ formatHotkey(hotkeyClipRegModifier) }}</span>
+          <span v-else>按下新的热键...</span>
+        </button>
+        <div v-if="clipRegModifierError" class="error-text">{{ clipRegModifierError }}</div>
       </div>
 
       <!-- 热键设置 - 仅在Tauri环境中显示 -->
@@ -131,7 +159,7 @@ import { Toast } from 'vant';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 
 // 类型定义
-type HotkeyType = 'send' | 'screenshot';
+type HotkeyType = 'send' | 'screenshot' | 'clipRegModifier';
 const VALID_MODIFIERS = ['Control', 'Alt', 'Shift', 'Meta'] as const;
 type Modifier = typeof VALID_MODIFIERS[number];
 
@@ -146,6 +174,7 @@ interface HotkeyConfig {
 interface TooltipState {
   clipReg: boolean;
   clipRegSync: boolean;
+  clipRegModifier: boolean;
   [key: string]: boolean;
 }
 
@@ -179,12 +208,14 @@ export default defineComponent({
     const tooltipState = ref<TooltipState>({
       clipReg: false,
       clipRegSync: false,
+      clipRegModifier: false,
       send: false,
       screenshot: false,
     });
     const errorMessages = ref<Record<HotkeyType, string>>({
       send: '',
       screenshot: '',
+      clipRegModifier: '',
     });
 
     // 计算属性
@@ -197,7 +228,6 @@ export default defineComponent({
       get: () => clipRegStore.enabled,
       set: async (value: boolean) => {
         await hotkeyService.setClipRegEnabled(value);
-        Toast.success(`剪切板寄存器功能已${value ? '启用' : '禁用'}`);
       }
     });
 
@@ -205,7 +235,6 @@ export default defineComponent({
       get: () => clipRegStore.syncEnabled,
       set: async (value: boolean) => {
         await hotkeyService.setClipRegSyncEnabled(value);
-        Toast.success(`剪切板寄存器同步已${value ? '启用' : '禁用'}`);
       }
     });
 
@@ -220,13 +249,24 @@ export default defineComponent({
         currentHotkey: formatHotkey(
           config.type === 'send' 
             ? settingsStore.hotkeySendText 
-            : settingsStore.hotkeyScreenshot
+            : config.type === 'screenshot' 
+              ? settingsStore.hotkeyScreenshot
+              : settingsStore.hotkeyClipRegModifier
         ),
         setter: config.type === 'send'
           ? hotkeyService.setReadClipboardTextHotkey.bind(hotkeyService)
-          : hotkeyService.setScreenshotHotkey.bind(hotkeyService),
+          : config.type === 'screenshot'
+            ? hotkeyService.setScreenshotHotkey.bind(hotkeyService)
+            : hotkeyService.setClipRegModifier.bind(hotkeyService),
       }))
     );
+
+    const hotkeyClipRegModifier = computed({
+      get: () => settingsStore.hotkeyClipRegModifier,
+      set: (value: string) => settingsStore.setHotkeyClipRegModifier(value)
+    });
+
+    const clipRegModifierError = computed(() => errorMessages.value.clipRegModifier);
 
     // 工具函数
     const formatHotkey = (hotkey: string) => hotkey.replace(/Control/g, 'Ctrl');
@@ -236,7 +276,7 @@ export default defineComponent({
       const nonModifiers = keys.filter(k => !VALID_MODIFIERS.includes(k as Modifier));
 
       if (modifiers.length === 0) {
-        return { isValid: false, message: '请至少包含一个修饰键 (Ctrl/Alt/Shift)' };
+        return { isValid: false, message: '请至少包含一个修饰键 (Ctrl/Alt)' };
       }
       
       if (nonModifiers.length !== 1) {
@@ -305,6 +345,52 @@ export default defineComponent({
       window.addEventListener('keydown', handleKeyDown);
     };
 
+    const startListeningForClipRegModifier = async () => {
+      if (isListening.value) return;
+      
+      isListening.value = true;
+      activeConfigType.value = 'clipRegModifier';
+      errorMessages.value.clipRegModifier = '';
+
+      const handleKeyDown = async (event: KeyboardEvent) => {
+        event.preventDefault();
+        
+        const keys: string[] = [];
+        if (event.ctrlKey) keys.push('Control');
+        if (event.altKey) keys.push('Alt');
+        if (event.shiftKey) keys.push('Shift');
+        if (event.metaKey) keys.push('Meta');
+        
+        // 修饰键必须只有一个
+        if (keys.length !== 1) {
+          errorMessages.value.clipRegModifier = '请只选择一个修饰键 (Ctrl/Alt/Shift)';
+          return;
+        }
+
+        try {
+          const success = await hotkeyService.setClipRegModifier(keys[0]);
+          if (success) {
+            Toast.success('修饰键设置成功');
+          } else {
+            errorMessages.value.clipRegModifier = '修饰键设置失败';
+          }
+        } catch (error) {
+          errorMessages.value.clipRegModifier = '设置失败，请重试';
+          console.error('修饰键设置错误:', error);
+        }
+
+        cleanup();
+      };
+
+      const cleanup = () => {
+        isListening.value = false;
+        activeConfigType.value = null;
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+    };
+
     const getMonitorCount = async () => {
       if (!isTauriEnv.value) return;
       
@@ -336,12 +422,16 @@ export default defineComponent({
       activeConfigType,
       hotkeyConfigs,
       startListening,
+      startListeningForClipRegModifier,
       errorMessages,
+      clipRegModifierError,
       selectedMonitor,
       monitorCount,
       isTauriEnv,
       clipRegEnabled,
       clipRegSyncEnabled,
+      hotkeyClipRegModifier,
+      formatHotkey,
     };
   },
 });

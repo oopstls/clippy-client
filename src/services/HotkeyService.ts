@@ -274,31 +274,31 @@ class HotkeyService {
   private generateRegisterConfigs(): RegisterConfig[] {
     const configs: RegisterConfig[] = [];
     
-    // 根据平台选择修饰键
-    const modKey = this.isMacOS ? 'Command' : 'Alt';
+    // 获取用户设置的修饰键
+    const modifier = this.settingsStore.hotkeyClipRegModifier;
     
-    // Ctrl+Alt+1 到 Ctrl+Alt+5 (粘贴)
+    // 修饰键+(1-5) (粘贴操作)
     for (let i = 0; i < this.REGISTER_COUNT; i++) {
       configs.push({
-        shortcut: `Ctrl+${modKey}+${i + 1}`,
+        shortcut: `${modifier}+${i + 1}`,
         operation: RegisterOperation.PASTE,
         index: i
       });
     }
     
-    // Ctrl+Alt+6 到 Ctrl+Alt+0 (保存)
+    // 修饰键+(6-0) (保存操作)
     this.SAVE_KEYS.forEach((key, i) => {
       configs.push({
-        shortcut: `Ctrl+${modKey}+${key}`,
+        shortcut: `${modifier}+${key}`,
         operation: RegisterOperation.SAVE,
         index: i
       });
     });
     
-    // Ctrl+Shift+Alt+1 到 Ctrl+Shift+Alt+5 (模拟输入)
+    // Ctrl+Shift+(1-5) (模拟输入操作，固定不可修改)
     for (let i = 0; i < this.REGISTER_COUNT; i++) {
       configs.push({
-        shortcut: `Ctrl+Shift+${modKey}+${i + 1}`,
+        shortcut: `Control+Shift+${i + 1}`,
         operation: RegisterOperation.TYPE,
         index: i
       });
@@ -364,6 +364,24 @@ class HotkeyService {
   async setClipRegSyncEnabled(enabled: boolean): Promise<void> {
     if (!this.isTauriEnv) return;
     this.clipRegStore.setSyncEnabled(enabled);
+  }
+
+  // 设置剪切板寄存器修饰键
+  async setClipRegModifier(newModifier: string): Promise<boolean> {
+    return this.inTauriOrFalse(async () => {
+      // 先注销现有的热键
+      await this.unregisterClipRegHotkeys();
+      
+      // 更新设置
+      this.settingsStore.setHotkeyClipRegModifier(newModifier);
+      
+      // 重新注册热键
+      if (this.clipRegStore.enabled) {
+        await this.initClipRegHotkeys();
+      }
+      
+      return true;
+    });
   }
 }
 
