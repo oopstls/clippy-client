@@ -1,44 +1,31 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 use base64::{engine::general_purpose, Engine as _};
-use enigo::{
-    Direction::{Click, Press, Release},
-    Enigo, Key, Keyboard, Settings,
-};
 use std::io::Cursor;
-use std::thread;
-use std::time::Duration;
 use xcap::Monitor;
+
+mod input;
 
 #[tauri::command]
 fn get_monitor_count() -> usize {
     Monitor::all().map(|m| m.len()).unwrap_or(1)
 }
 
-fn get_platform_modifier_key() -> Key {
-    if tauri_plugin_os::platform() == "macos" {
-        return Key::Meta;
-    } else {
-        return Key::Control;
-    }
-}
-
 #[tauri::command]
 fn paste_text() {
-    thread::sleep(Duration::from_secs(1));
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
-
-    let modifier_key = get_platform_modifier_key();
-    enigo.key(modifier_key, Press).unwrap();
-    enigo.key(Key::Unicode('v'), Click).unwrap();
-    enigo.key(modifier_key, Release).unwrap();
+    input::paste_text();
 }
 
+/// 模拟键盘输入文本
+/// 
+/// 该函数具有以下行为:
+/// - 首次调用: 开始模拟键盘输入文本
+/// - 再次调用: 暂停当前输入
+/// - 暂停状态下调用且文本相同: 继续输入
+/// - 文本不同: 重置输入状态，并从头开始输入新文本
 #[tauri::command]
 fn type_text(text: String) {
-    thread::sleep(Duration::from_secs(1));
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    enigo.text(&text).unwrap();
+    input::type_text(&text);
 }
 
 #[tauri::command]
