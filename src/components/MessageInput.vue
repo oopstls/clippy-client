@@ -45,13 +45,12 @@
             </svg>
           </button>
         </div>
-        
         <div 
           v-if="showDropdown" 
-          class="absolute z-10 right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 w-32 min-w-[120px] max-h-[200px] overflow-y-auto"
+          class="absolute z-10 right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 w-64 min-w-[200px] max-h-[200px] overflow-y-auto"
         >
-          <div class="text-xs text-gray-500 px-4 py-1 border-b border-gray-100">剪切板寄存器</div>
-          <div class="grid grid-cols-5 gap-1 p-2">
+          <div class="text-xs text-gray-500 px-4 py-1 border-b border-gray-100 text-center">剪切板寄存器</div>
+          <div class="grid grid-cols-5 gap-2 p-3">
             <button 
               v-for="i in 5" 
               :key="`reg-${i}`" 
