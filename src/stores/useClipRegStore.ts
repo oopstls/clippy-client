@@ -1,14 +1,26 @@
 import { defineStore } from 'pinia';
 
 export const useClipRegStore = defineStore('clipReg', {
-  state: () => ({
-    // 5个剪切板寄存器，索引0-4对应寄存器1-5
-    registers: ['', '', '', '', ''] as string[],
-    // 剪切板寄存器功能是否启用
-    enabled: true,
-    // 是否同步到其他设备
-    syncEnabled: true
-  }),
+  state: () => {
+    // 从 localStorage 读取数据或使用默认值
+    const registersJson = localStorage.getItem('clipRegisters');
+    const registers = registersJson ? JSON.parse(registersJson) : ['', '', '', '', ''];
+    
+    // 读取剪切板寄存器功能启用状态
+    const enabled = localStorage.getItem('clipRegEnabled') !== 'false';
+    
+    // 读取同步功能启用状态
+    const syncEnabled = localStorage.getItem('clipRegSyncEnabled') === 'true';
+    
+    return {
+      // 5个剪切板寄存器，索引0-4对应寄存器1-5
+      registers: registers as string[],
+      // 剪切板寄存器功能是否启用
+      enabled,
+      // 是否同步到其他设备
+      syncEnabled
+    };
+  },
   
   actions: {
     /**
@@ -17,9 +29,12 @@ export const useClipRegStore = defineStore('clipReg', {
      */
     setEnabled(status: boolean) {
       this.enabled = status;
+      localStorage.setItem('clipRegEnabled', status.toString());
+      
       if (!status) {
         // 关闭剪切板寄存器功能时，同时关闭同步功能
         this.syncEnabled = false;
+        localStorage.setItem('clipRegSyncEnabled', 'false');
       }
     },
     
@@ -29,6 +44,7 @@ export const useClipRegStore = defineStore('clipReg', {
      */
     setSyncEnabled(status: boolean) {
       this.syncEnabled = status;
+      localStorage.setItem('clipRegSyncEnabled', status.toString());
     },
     
     /**
@@ -39,6 +55,8 @@ export const useClipRegStore = defineStore('clipReg', {
     saveToRegister(registerIndex: number, content: string) {
       if (registerIndex >= 0 && registerIndex < 5) {
         this.registers[registerIndex] = content;
+        // 保存到 localStorage
+        localStorage.setItem('clipRegisters', JSON.stringify(this.registers));
       }
     },
     
@@ -59,6 +77,7 @@ export const useClipRegStore = defineStore('clipReg', {
      */
     clearAllRegisters() {
       this.registers = ['', '', '', '', ''];
+      localStorage.setItem('clipRegisters', JSON.stringify(this.registers));
     }
   }
 }); 
