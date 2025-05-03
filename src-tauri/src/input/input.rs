@@ -9,10 +9,6 @@ use once_cell::sync::Lazy;
 use rand::Rng;
 use super::syntax_tree::{Node, NodeContent, Parser};
 
-static ENIGO: Lazy<Mutex<Enigo>> = Lazy::new(|| {
-    Mutex::new(Enigo::new(&Settings::default()).unwrap())
-});
-
 /// 输入状态结构体，管理输入过程中的各种状态
 struct TypeState {
     is_typing: bool,                // 是否正在输入
@@ -57,7 +53,7 @@ pub fn get_platform_modifier_key() -> Key {
 /// 模拟按下Ctrl+V/Cmd+V粘贴剪贴板内容
 pub fn paste_text() {
     thread::sleep(Duration::from_secs(1));
-    let mut enigo = ENIGO.lock().unwrap();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     let modifier_key = get_platform_modifier_key();
 
     enigo.key(modifier_key, Press).unwrap();
@@ -115,7 +111,7 @@ pub fn type_text(text: &str) {
             // 获取剩余需要输入的字符序列
             if next_position < sequence.len() {
                 let remaining_seq = &sequence[next_position..];
-                let mut enigo = ENIGO.lock().unwrap();
+                let mut enigo = Enigo::new(&Settings::default()).unwrap();
                 let mut prev_char = None;
                 
                 let mut current_position = next_position;
