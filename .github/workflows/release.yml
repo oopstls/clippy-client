@@ -19,18 +19,18 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      # 1. checkout repo
+      # checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. install node
+      # install node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
 
-      # 3. cache Rust/Cargo dependencies
+      # cache Rust/Cargo dependencies
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
@@ -44,11 +44,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # 4：install node dependencies
+      # install node dependencies
       - name: Install frontend dependencies
-        run: pnpm install
+        run: npm install
 
-      # 5：build and release
+      # build and release
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0
         env:
